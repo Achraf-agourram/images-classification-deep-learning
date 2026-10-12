@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.ipynb_checkpoints/
+
+data/intel_image_classification/*
+!data/intel_image_classification/.gitkeep
+
+data/splits/*
+!data/splits/.gitkeep
+
+data/image_audit.csv
+models/*
+!models/.gitkeep
