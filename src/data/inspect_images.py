@@ -100,3 +100,125 @@ def inspect_image(image_path, class_name):
 
     return result
 
+
+def inspect_dataset():
+    class_directory = find_class_directory()
+    records = []
+
+    for class_folder in sorted(class_directory.iterdir()):
+        if not class_folder.is_dir():
+            continue
+
+        if not contains_images(class_folder):
+            continue
+
+        image_paths = [
+            path
+            for path in class_folder.rglob("*")
+            if path.is_file()
+            and path.suffix.lower() in IMAGE_EXTENSIONS
+        ]
+
+        for image_path in image_paths:
+            records.append(
+                inspect_image(image_path, class_folder.name)
+            )
+
+    if not records:
+        raise ValueError("No images were found.")
+
+    audit_df = pd.DataFrame(records)
+
+    valid_df = audit_df[audit_df["valid"]].copy()
+
+    duplicate_hashes = set(
+        valid_df["sha256"][
+            valid_df["sha256"].duplicated(keep=False)
+        ].dropna()
+    )
+
+    duplicate_mask = audit_df["sha256"].isin(duplicate_hashes)
+
+    for index in audit_df.index[duplicate_mask]:
+        current_issues = audit_df.at[index, "issues"]
+
+        if current_issues:
+            audit_df.at[index, "issues"] = (
+                current_issues + "; exact_duplicate"
+            )
+        else:
+            audit_df.at[index, "issues"] = "exact_duplicate"
+
+    reports_dir = Path("reports/metrics")
+    reports_dir.mkdir(parents=True, exist_ok=True)
+
+    audit_path = reports_dir / "image_audit.csv"
+    problems_path = reports_dir / "problematic_images.csv"
+
+    audit_df.to_csv(audit_path, index=False)
+
+    problematic_df = audit_df[
+        audit_df["issues"] != ""
+    ].copy()
+
+    problematic_df.to_csv(problems_path, index=False)
+
+    print(f"Class directory: {class_directory}")
+    print(f"Total images inspected: {len(audit_df)}")
+    print(f"Readable images: {len(valid_df)}")
+    print(f"Unreadable images: {(~audit_df['valid']).sum()}")
+
+    print("\nImage formats:")
+    print(
+        valid_df["format"]
+        .value_counts()
+        .to_string()
+    )
+
+    print("\nImage dimensions:")
+    if not valid_df.empty:
+        dimensions = (
+            valid_df["width"].astype(int).astype(str)
+            + " x "
+            + valid_df["height"].astype(int).astype(str)
+        )
+
+        print(dimensions.value_counts().head(15).to_string())
+
+        print("\nDimension summary:")
+        print(
+            valid_df[["width", "height"]]
+            .describe()
+            .round(2)
+            .to_string()
+        )
+
+    print("\nImage modes:")
+    print(valid_df["mode"].value_counts().to_string())
+
+    print("\nData quality issues:")
+
+    issue_names = [
+        "empty_file",
+        "unreadable_image",
+        "extension_format_mismatch",
+        "small_dimensions",
+        "small_file_size",
+        "exact_duplicate"
+    ]
+
+    for issue in issue_names:
+        count = audit_df["issues"].apply(
+            lambda value: issue in value.split("; ")
+        ).sum()
+
+        print(f"{issue}: {count}")
+
+    print(f"\nFull report: {audit_path}")
+    print(f"Problematic images: {problems_path}")
+
+    return audit_df
+
+
+if __name__ == "__main__":
+    inspect_dataset()
