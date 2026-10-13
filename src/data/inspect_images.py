@@ -2,6 +2,7 @@ from pathlib import Path
 import hashlib
 import pandas as pd
 from PIL import Image
+from src.data.explore_dataset import find_class_directory, contains_images
 
 
 DATASET_DIR = Path("data/intel_image_classification")
@@ -27,3 +28,14 @@ EXPECTED_FORMATS = {
     ".tif": "TIFF",
     ".tiff": "TIFF"
 }
+
+
+def calculate_hash(image_path):
+    digest = hashlib.sha256()
+
+    with image_path.open("rb") as file:
+        for chunk in iter(lambda: file.read(8192), b""):
+            digest.update(chunk)
+
+    return digest.hexdigest()
+
