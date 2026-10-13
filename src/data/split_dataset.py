@@ -8,115 +8,106 @@ DATASET_DIR = Path("data/intel_image_classification")
 OUTPUT_DIR = Path("data/splits")
 AUDIT_PATH = Path("reports/metrics/image_audit.csv")
 
-IMAGE_EXTENSIONS = {
-    ".jpg",
-    ".jpeg",
-    ".png",
-    ".bmp",
-    ".gif",
-    ".webp",
-    ".tif",
-    ".tiff"
-}
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
 RANDOM_STATE = 42
 
-def collect_images(class_directory):
+
+def collect_images():
+    class_directory = find_class_directory()
     records = []
 
-    for class_folder in sorted(class_directory.iterdir()):
-        if not class_folder.is_dir() or not contains_images(class_folder):
+    for class_folder in class_directory.iterdir():
+        if not class_folder.is_dir():
             continue
 
-        for image_path in sorted(class_folder.rglob("*")):
-            if (
-                image_path.is_file()
-                and image_path.suffix.lower() in IMAGE_EXTENSIONS
-            ):
+        for image_path in class_folder.rglob("*"):
+            if (image_path.is_file() and image_path.suffix.lower() in IMAGE_EXTENSIONS):
                 records.append({
-                    "path": str(image_path),
+                    "path": image_path.as_posix(),
                     "label": class_folder.name
                 })
 
-    return pd.DataFrame(records)
+    data = pd.DataFrame(records)
+
+    if data.empty:
+        raise ValueError("No images were found in the dataset.")
+
+    return data
 
 
 def remove_unreadable_images(data):
     if not AUDIT_PATH.exists():
-        print("Image audit not found. Skipping the readability filter.")
         return data
 
     audit = pd.read_csv(AUDIT_PATH)
 
     if not {"path", "valid"}.issubset(audit.columns):
-        print("Image audit has an unexpected format. Skipping the filter.")
         return data
 
-    valid_status = (
-        audit["valid"]
-        .astype(str)
-        .str.lower()
-        .isin({"true", "1"})
-    )
+    data = data.copy()
+    audit = audit.copy()
 
-    invalid_paths = set(
-        audit.loc[~valid_status, "path"].astype(str)
-    )
+    data["path"] = data["path"].astype(str).str.replace("\\", "/", regex=False)
+    audit["path"] = audit["path"].astype(str).str.replace("\\", "/", regex=False)
 
-    filtered_data = data[~data["path"].isin(invalid_paths)].copy()
+    valid_values = audit["valid"].astype(str).str.lower().eq("true")
+    invalid_paths = set(audit.loc[~valid_values, "path"])
 
-    print(f"Unreadable images excluded: {len(data) - len(filtered_data)}")
+    initial_count = len(data)
+    data = data[~data["path"].isin(invalid_paths)].copy()
 
-    return filtered_data
+    print(f"Unreadable images removed: {initial_count - len(data)}")
 
-
-def save_split(data, split_name):
-
-    for row in data.itertuples(index=False):
-
-        source = Path(row.path)
-        destination_folder = OUTPUT_DIR / split_name / row.label
-        destination_folder.mkdir(parents=True, exist_ok=True)
-
-        destination = destination_folder / source.name
-
-        if destination.exists():
-            raise FileExistsError(f"Two images have the same filename: {destination}")
-
-        shutil.copy2(source, destination)
+    return data
 
 
-def split_dataset():
+def create_splits(data):
+    X = data["path"]
+    y = data["label"]
 
-    class_directory = find_class_directory()
-    data = collect_images(class_directory)
-
-    if data.empty:
-        raise ValueError("No labeled images were found.")
-
-    data = remove_unreadable_images(data)
-
-    if data.empty:
-        raise ValueError("No valid images remain.")
-
-    class_counts = data["label"].value_counts()
-
-    if (class_counts < 3).any():
-        raise ValueError("Every class must contain at least three valid images.")
-
-    train_data, temporary_data = train_test_split(
-        data,
+    X_train, X_temp, y_train, y_temp = train_test_split(
+        X,
+        y,
         test_size=0.30,
         random_state=RANDOM_STATE,
-        stratify=data["label"]
+        stratify=y
     )
 
-    validation_data, test_data = train_test_split(
-        temporary_data,
+    X_validation, X_test, y_validation, y_test = train_test_split(
+        X_temp,
+        y_temp,
         test_size=0.50,
         random_state=RANDOM_STATE,
-        stratify=temporary_data["label"]
+        stratify=y_temp
     )
+
+    train_data = pd.DataFrame({
+        "path": X_train.to_numpy(),
+        "label": y_train.to_numpy()
+    })
+
+    validation_data = pd.DataFrame({
+        "path": X_validation.to_numpy(),
+        "label": y_validation.to_numpy()
+    })
+
+    test_data = pd.DataFrame({
+        "path": X_test.to_numpy(),
+        "label": y_test.to_numpy()
+    })
+
+    return train_data, validation_data, test_data
+
+
+def save_splits(train_data, validation_data, test_data):
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    for split_name in ["train", "validation", "test"]:
+        old_directory = OUTPUT_DIR / split_name
+
+        if old_directory.is_dir():
+            shutil.rmtree(old_directory)
 
     splits = {
         "train": train_data,
@@ -124,51 +115,64 @@ def split_dataset():
         "test": test_data
     }
 
-    if OUTPUT_DIR.exists():
-        shutil.rmtree(OUTPUT_DIR)
+    for split_name, split_data in splits.items():
+        output_path = OUTPUT_DIR / f"{split_name}.csv"
+        split_data.to_csv(output_path, index=False)
+
+    distribution = pd.concat(
+        [
+            split_data[["label"]].assign(split=split_name)
+            for split_name, split_data in splits.items()
+        ],
+        ignore_index=True
+    )
+
+    counts = pd.crosstab(
+        distribution["label"],
+        distribution["split"]
+    )
+
+    counts = counts.reindex(
+        columns=["train", "validation", "test"],
+        fill_value=0
+    )
+
+    counts["total"] = counts[["train", "validation", "test"]].sum(axis=1)
+
+    for split_name in ["train", "validation", "test"]:
+        counts[f"{split_name}_percentage"] = (
+            counts[split_name] / counts["total"] * 100
+        ).round(2)
+
+    counts.to_csv(OUTPUT_DIR / "class_distribution.csv")
+
+    print("\nSplit results:")
 
     for split_name, split_data in splits.items():
-        save_split(split_data, split_name)
-
-    counts = pd.crosstab(data["label"], data.index.map(
-        lambda index: (
-            "train"
-            if index in train_data.index
-            else "validation"
-            if index in validation_data.index
-            else "test"
-        )
-    ))
-
-    counts = counts.reindex(columns=["train", "validation", "test"], fill_value=0)
-
-    distribution = counts.copy()
-
-    for split_name, split_data in splits.items():
-        distribution[f"{split_name}_percent"] = (counts[split_name] / len(split_data) * 100).round(2)
-
-    distribution["total"] = counts.sum(axis=1)
-
-    total_images = sum(len(split_data) for split_data in splits.values())
-
-    print(f"Source directory: {class_directory}")
-    print(f"Total labeled images: {total_images}")
-
-    print("\nSplit summary:")
-
-    for split_name, split_data in splits.items():
-        percentage = len(split_data) / total_images * 100
-
+        percentage = len(split_data) / len(distribution) * 100
         print(
             f"{split_name}: {len(split_data)} images "
             f"({percentage:.2f}%)"
         )
 
     print("\nClass distribution:")
-    print(distribution.to_string())
+    print(counts)
 
-    print(f"\nSplits saved to: {OUTPUT_DIR.resolve()}")
+
+def main():
+    data = collect_images()
+    data = remove_unreadable_images(data)
+
+    if data.empty:
+        raise ValueError("No valid images remain after filtering.")
+
+    print(f"Total valid images: {len(data)}")
+    print(f"Number of classes: {data['label'].nunique()}")
+
+    train_data, validation_data, test_data = create_splits(data)
+
+    save_splits(train_data, validation_data, test_data)
 
 
 if __name__ == "__main__":
-    split_dataset()
+    main()
