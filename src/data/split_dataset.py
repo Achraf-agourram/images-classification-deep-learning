@@ -39,3 +39,32 @@ def collect_images(class_directory):
                 })
 
     return pd.DataFrame(records)
+
+
+def remove_unreadable_images(data):
+    if not AUDIT_PATH.exists():
+        print("Image audit not found. Skipping the readability filter.")
+        return data
+
+    audit = pd.read_csv(AUDIT_PATH)
+
+    if not {"path", "valid"}.issubset(audit.columns):
+        print("Image audit has an unexpected format. Skipping the filter.")
+        return data
+
+    valid_status = (
+        audit["valid"]
+        .astype(str)
+        .str.lower()
+        .isin({"true", "1"})
+    )
+
+    invalid_paths = set(
+        audit.loc[~valid_status, "path"].astype(str)
+    )
+
+    filtered_data = data[~data["path"].isin(invalid_paths)].copy()
+
+    print(f"Unreadable images excluded: {len(data) - len(filtered_data)}")
+
+    return filtered_data
