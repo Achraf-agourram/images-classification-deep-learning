@@ -11,6 +11,12 @@ data/intel_image_classification/*
 data/splits/*
 !data/splits/.gitkeep
 
+reports/figures/*
+reports/metrics/*
+
+!reports/figures/.gitkeep
+!reports/metrics/.gitkeep
+
 data/image_audit.csv
 models/*
 !models/.gitkeep
