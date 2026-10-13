@@ -9,7 +9,7 @@ IMAGE_EXTENSIONS = {".jpg",  ".jpeg",  ".png"}
 
 def contains_images(folder):
 
-    return list(file.is_file() and file.suffix.lower() in IMAGE_EXTENSIONS  for file in folder.rglob("*"))
+    return any(file.is_file() and file.suffix.lower() in IMAGE_EXTENSIONS  for file in folder.rglob("*"))
 
 
 
