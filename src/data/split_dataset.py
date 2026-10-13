@@ -85,3 +85,90 @@ def save_split(data, split_name):
 
         shutil.copy2(source, destination)
 
+
+def split_dataset():
+
+    class_directory = find_class_directory()
+    data = collect_images(class_directory)
+
+    if data.empty:
+        raise ValueError("No labeled images were found.")
+
+    data = remove_unreadable_images(data)
+
+    if data.empty:
+        raise ValueError("No valid images remain.")
+
+    class_counts = data["label"].value_counts()
+
+    if (class_counts < 3).any():
+        raise ValueError("Every class must contain at least three valid images.")
+
+    train_data, temporary_data = train_test_split(
+        data,
+        test_size=0.30,
+        random_state=RANDOM_STATE,
+        stratify=data["label"]
+    )
+
+    validation_data, test_data = train_test_split(
+        temporary_data,
+        test_size=0.50,
+        random_state=RANDOM_STATE,
+        stratify=temporary_data["label"]
+    )
+
+    splits = {
+        "train": train_data,
+        "validation": validation_data,
+        "test": test_data
+    }
+
+    if OUTPUT_DIR.exists():
+        shutil.rmtree(OUTPUT_DIR)
+
+    for split_name, split_data in splits.items():
+        save_split(split_data, split_name)
+
+    counts = pd.crosstab(data["label"], data.index.map(
+        lambda index: (
+            "train"
+            if index in train_data.index
+            else "validation"
+            if index in validation_data.index
+            else "test"
+        )
+    ))
+
+    counts = counts.reindex(columns=["train", "validation", "test"], fill_value=0)
+
+    distribution = counts.copy()
+
+    for split_name, split_data in splits.items():
+        distribution[f"{split_name}_percent"] = (counts[split_name] / len(split_data) * 100).round(2)
+
+    distribution["total"] = counts.sum(axis=1)
+
+    total_images = sum(len(split_data) for split_data in splits.values())
+
+    print(f"Source directory: {class_directory}")
+    print(f"Total labeled images: {total_images}")
+
+    print("\nSplit summary:")
+
+    for split_name, split_data in splits.items():
+        percentage = len(split_data) / total_images * 100
+
+        print(
+            f"{split_name}: {len(split_data)} images "
+            f"({percentage:.2f}%)"
+        )
+
+    print("\nClass distribution:")
+    print(distribution.to_string())
+
+    print(f"\nSplits saved to: {OUTPUT_DIR.resolve()}")
+
+
+if __name__ == "__main__":
+    split_dataset()
