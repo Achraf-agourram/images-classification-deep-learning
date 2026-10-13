@@ -68,3 +68,20 @@ def remove_unreadable_images(data):
     print(f"Unreadable images excluded: {len(data) - len(filtered_data)}")
 
     return filtered_data
+
+
+def save_split(data, split_name):
+
+    for row in data.itertuples(index=False):
+
+        source = Path(row.path)
+        destination_folder = OUTPUT_DIR / split_name / row.label
+        destination_folder.mkdir(parents=True, exist_ok=True)
+
+        destination = destination_folder / source.name
+
+        if destination.exists():
+            raise FileExistsError(f"Two images have the same filename: {destination}")
+
+        shutil.copy2(source, destination)
+
