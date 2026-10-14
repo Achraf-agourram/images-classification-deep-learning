@@ -106,3 +106,17 @@ def create_datasets():
         test_dataset,
         class_names
     )
+
+
+if __name__ == "__main__":
+    train_ds, validation_ds, test_ds, class_names = create_datasets()
+
+    print("Classes:", class_names)
+    print("Preprocessing completed.")
+
+    images, labels = next(iter(train_ds))
+
+    print("Image batch shape:", images.shape)
+    print("Label batch shape:", labels.shape)
+    print("Minimum pixel value:", tf.reduce_min(images).numpy())
+    print("Maximum pixel value:", tf.reduce_max(images).numpy())
