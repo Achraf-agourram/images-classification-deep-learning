@@ -72,3 +72,37 @@ def create_dataset(csv_path, class_to_index, training=False):
         )
 
     return dataset.prefetch(AUTOTUNE)
+
+
+def create_datasets():
+    train_data = pd.read_csv(SPLIT_DIR / "train.csv")
+
+    class_names = sorted(train_data["label"].unique())
+
+    class_to_index = {
+        class_name: index
+        for index, class_name in enumerate(class_names)
+    }
+
+    train_dataset = create_dataset(
+        SPLIT_DIR / "train.csv",
+        class_to_index,
+        training=True
+    )
+
+    validation_dataset = create_dataset(
+        SPLIT_DIR / "validation.csv",
+        class_to_index
+    )
+
+    test_dataset = create_dataset(
+        SPLIT_DIR / "test.csv",
+        class_to_index
+    )
+
+    return (
+        train_dataset,
+        validation_dataset,
+        test_dataset,
+        class_names
+    )
