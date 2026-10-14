@@ -117,6 +117,3 @@ if __name__ == "__main__":
     images, labels = next(iter(train_ds))
 
     print("Image batch shape:", images.shape)
-    print("Label batch shape:", labels.shape)
-    print("Minimum pixel value:", tf.reduce_min(images).numpy())
-    print("Maximum pixel value:", tf.reduce_max(images).numpy())
