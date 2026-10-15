@@ -34,6 +34,18 @@ def train_model():
         )
     ]
 
+    history = model.fit(
+        train_ds,
+        validation_data=validation_ds,
+        epochs=EPOCHS,
+        callbacks=callbacks
+    )
+
+    MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+    HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    model.save(MODEL_PATH)
+
 
 
 if __name__ == "__main__":
