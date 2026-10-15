@@ -46,6 +46,31 @@ def train_model():
 
     model.save(MODEL_PATH)
 
+    history_data = pd.DataFrame(history.history)
+    history_data.index = range(1, len(history_data) + 1)
+    history_data.to_csv(HISTORY_PATH, index_label="epoch")
+
+    best_loss_epoch = int(
+        history_data["val_loss"].idxmin()
+    )
+
+    best_accuracy_epoch = int(
+        history_data["val_accuracy"].idxmax()
+    )
+
+    print(f"Classes: {class_names}")
+    print(f"Model saved to: {MODEL_PATH}")
+    print(f"Training history saved to: {HISTORY_PATH}")
+    print(f"Training curves saved to: {PLOT_PATH}")
+
+    print(f"Best validation loss: {history_data['val_loss'].min():.4f}")
+    print(f"Epoch with best validation loss: {best_loss_epoch}")
+
+    print(
+        f"Best validation accuracy: "
+        f"{history_data['val_accuracy'].max():.4f}"
+    )
+    print(f"Epoch with best validation accuracy: {best_accuracy_epoch}")
 
 
 if __name__ == "__main__":
