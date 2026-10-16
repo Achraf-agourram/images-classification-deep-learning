@@ -62,6 +62,153 @@ def evaluate_model():
 
     labels = np.arange(len(class_names))
 
+    metrics = {
+        "accuracy": float(accuracy_score(y_true, y_pred)),
+        "precision_macro": float(
+            precision_score(
+                y_true, y_pred, average="macro", zero_division=0
+            )
+        ),
+        "recall_macro": float(
+            recall_score(
+                y_true, y_pred, average="macro", zero_division=0
+            )
+        ),
+        "f1_macro": float(
+            f1_score(
+                y_true, y_pred, average="macro", zero_division=0
+            )
+        ),
+        "precision_weighted": float(
+            precision_score(
+                y_true, y_pred, average="weighted", zero_division=0
+            )
+        ),
+        "recall_weighted": float(
+            recall_score(
+                y_true, y_pred, average="weighted", zero_division=0
+            )
+        ),
+        "f1_weighted": float(
+            f1_score(
+                y_true, y_pred, average="weighted", zero_division=0
+            )
+        )
+    }
+
+    report = classification_report(
+        y_true,
+        y_pred,
+        labels=labels,
+        target_names=class_names,
+        output_dict=True,
+        zero_division=0
+    )
+
+    matrix = confusion_matrix(
+        y_true,
+        y_pred,
+        labels=labels
+    )
+
+    METRICS_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(METRICS_PATH, "w", encoding="utf-8") as file:
+        json.dump(metrics, file, indent=4)
+
+    pd.DataFrame(report).T.to_csv(REPORT_PATH, index=True)
+
+    pd.DataFrame(
+        matrix,
+        index=class_names,
+        columns=class_names
+    ).to_csv(CONFUSION_PATH, index=True)
+
+    misclassified_indices = np.flatnonzero(y_true != y_pred)
+
+    misclassified = pd.DataFrame({
+        "path": test_data.iloc[misclassified_indices]["path"].to_numpy(),
+        "true_label": [
+            class_names[y_true[index]]
+            for index in misclassified_indices
+        ],
+        "predicted_label": [
+            class_names[y_pred[index]]
+            for index in misclassified_indices
+        ],
+        "confidence": [
+            probabilities[index, y_pred[index]]
+            for index in misclassified_indices
+        ]
+    })
+
+    misclassified = misclassified.sort_values(
+        "confidence",
+        ascending=False
+    )
+
+    misclassified.to_csv(MISCLASSIFIED_PATH, index=False)
+
+    confusion_rows = []
+
+    for true_index in range(len(class_names)):
+        for predicted_index in range(len(class_names)):
+            count = int(matrix[true_index, predicted_index])
+
+            if true_index != predicted_index and count > 0:
+                confusion_rows.append({
+                    "true_class": class_names[true_index],
+                    "predicted_as": class_names[predicted_index],
+                    "count": count
+                })
+
+    common_confusions = pd.DataFrame(
+        confusion_rows,
+        columns=["true_class", "predicted_as", "count"]
+    )
+
+    if not common_confusions.empty:
+        common_confusions = common_confusions.sort_values(
+            "count",
+            ascending=False
+        )
+
+    common_confusions.to_csv(COMMON_CONFUSIONS_PATH, index=False)
+
+    print("\nTest Metrics")
+
+    for metric, value in metrics.items():
+        print(f"{metric}: {value:.4f}")
+
+    print("\nPerformance by Class")
+    print(
+        classification_report(
+            y_true,
+            y_pred,
+            labels=labels,
+            target_names=class_names,
+            zero_division=0
+        )
+    )
+
+    print("\nMost Common Confusions")
+
+    if common_confusions.empty:
+        print("No class confusions found.")
+    else:
+        for row in common_confusions.head(10).itertuples(index=False):
+            print(
+                f"{row.true_class} predicted as "
+                f"{row.predicted_as}: {row.count} images"
+            )
+
+    print(f"\nMetrics saved to: {METRICS_PATH}")
+    print(f"Class report saved to: {REPORT_PATH}")
+    print(f"Confusion matrix saved to: {CONFUSION_PATH}")
+    print(f"Confusion plot saved to: {CONFUSION_PLOT_PATH}")
+    print(f"Misclassified images saved to: {MISCLASSIFIED_PATH}")
+    print(f"Misclassified images plot: {MISCLASSIFIED_PLOT_PATH}")
+
 
 if __name__ == "__main__":
     evaluate_model()
