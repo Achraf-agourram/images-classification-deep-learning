@@ -2,7 +2,6 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 import tensorflow as tf
-
 from src.data.prepare_dataset import create_datasets
 from src.models.cnn import build_cnn
 
@@ -79,7 +78,7 @@ def train_model():
             factor=0.5,
             patience=2,
             min_lr=1e-6,
-            verbose=1
+            verbose=-1
         )
     ]
 
