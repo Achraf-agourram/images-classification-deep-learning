@@ -1,6 +1,5 @@
 from pathlib import Path
 import json
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -29,8 +28,72 @@ MISCLASSIFIED_PATH = Path("reports/metrics/misclassified_images.csv")
 CONFUSION_PLOT_PATH = Path("reports/figures/confusion_matrix.png")
 MISCLASSIFIED_PLOT_PATH = Path("reports/figures/misclassified_images.png")
 
+def plot_confusion_matrix(matrix, class_names):
+    figure, axis = plt.subplots(figsize=(9, 7))
+
+    display = ConfusionMatrixDisplay(
+        confusion_matrix=matrix,
+        display_labels=class_names
+    )
+
+    display.plot(
+        ax=axis,
+        cmap="Blues",
+        values_format="d",
+        xticks_rotation=45,
+        colorbar=False
+    )
+
+    axis.set_title("Confusion Matrix")
+    figure.tight_layout()
+
+    CONFUSION_PLOT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(CONFUSION_PLOT_PATH, dpi=150)
+    plt.close(figure)
+
+
+def plot_misclassified_images(misclassified, limit=12):
+    if misclassified.empty:
+        print("No misclassified images found.")
+        return
+
+    samples = misclassified.head(limit)
+
+    columns = 3
+    rows = int(np.ceil(len(samples) / columns))
+
+    figure, axes = plt.subplots(
+        rows,
+        columns,
+        figsize=(12, rows * 4),
+        squeeze=False
+    )
+
+    for axis, sample in zip(axes.flat, samples.itertuples(index=False)):
+        image = tf.keras.utils.load_img(
+            sample.path,
+            target_size=IMAGE_SIZE
+        )
+
+        axis.imshow(image)
+        axis.set_title(
+            f"True: {sample.true_label}\n"
+            f"Predicted: {sample.predicted_label}\n"
+            f"Confidence: {sample.confidence:.2%}"
+        )
+        axis.axis("off")
+
+    for axis in axes.flat[len(samples):]:
+        axis.axis("off")
+
+    figure.tight_layout()
+
+    MISCLASSIFIED_PLOT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(MISCLASSIFIED_PLOT_PATH, dpi=150)
+    plt.close(figure)
+
 def evaluate_model():
-    
+
     if not MODEL_PATH.exists():
         raise FileNotFoundError(f"Model not found: {MODEL_PATH}. Train the model first.")
 
@@ -124,6 +187,8 @@ def evaluate_model():
         columns=class_names
     ).to_csv(CONFUSION_PATH, index=True)
 
+    plot_confusion_matrix(matrix, class_names)
+
     misclassified_indices = np.flatnonzero(y_true != y_pred)
 
     misclassified = pd.DataFrame({
@@ -174,6 +239,8 @@ def evaluate_model():
         )
 
     common_confusions.to_csv(COMMON_CONFUSIONS_PATH, index=False)
+
+    plot_misclassified_images(misclassified)
 
     print("\nTest Metrics")
 
