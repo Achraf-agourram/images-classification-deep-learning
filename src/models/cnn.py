@@ -28,7 +28,6 @@ def build_cnn(input_shape=(150, 150, 3), num_classes=6):
             padding="same"
         ),
         tf.keras.layers.ReLU(),
-        tf.keras.layers.MaxPooling2D(pool_size=(2, 2)),
 
         tf.keras.layers.GlobalAveragePooling2D(),
 
