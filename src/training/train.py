@@ -15,9 +15,8 @@ PLOT_PATH = Path("reports/figures/training_curves.png")
 
 
 def plot_training_history(history):
-    # history_data = pd.DataFrame(history.history)
-    # history_data.index = range(1, len(history_data) + 1)
-    history_data = history
+    history_data = pd.DataFrame(history.history)
+    history_data.index = range(1, len(history_data) + 1)
 
     epochs = history_data.index
 
@@ -126,5 +125,4 @@ def train_model():
 
 
 if __name__ == "__main__":
-    # train_model()
-    plot_training_history(pd.read_csv(HISTORY_PATH, index_col="epoch"))
+    train_model()
