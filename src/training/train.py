@@ -78,7 +78,7 @@ def train_model():
             factor=0.5,
             patience=2,
             min_lr=1e-6,
-            verbose=-1
+            verbose=1
         )
     ]
 
