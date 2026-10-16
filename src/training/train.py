@@ -1,4 +1,5 @@
 from pathlib import Path
+import matplotlib.pyplot as plt
 import pandas as pd
 import tensorflow as tf
 
@@ -11,6 +12,55 @@ EPOCHS = 30
 MODEL_PATH = Path("models/cnn.keras")
 HISTORY_PATH = Path("reports/metrics/training_history.csv")
 PLOT_PATH = Path("reports/figures/training_curves.png")
+
+
+def plot_training_history(history):
+    # history_data = pd.DataFrame(history.history)
+    # history_data.index = range(1, len(history_data) + 1)
+    history_data = history
+
+    epochs = history_data.index
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+    axes[0].plot(
+        epochs,
+        history_data["accuracy"],
+        label="Training accuracy"
+    )
+    axes[0].plot(
+        epochs,
+        history_data["val_accuracy"],
+        label="Validation accuracy"
+    )
+    axes[0].set_title("Model Accuracy")
+    axes[0].set_xlabel("Epoch")
+    axes[0].set_ylabel("Accuracy")
+    axes[0].legend()
+    axes[0].grid(True)
+
+    axes[1].plot(
+        epochs,
+        history_data["loss"],
+        label="Training loss"
+    )
+    axes[1].plot(
+        epochs,
+        history_data["val_loss"],
+        label="Validation loss"
+    )
+    axes[1].set_title("Model Loss")
+    axes[1].set_xlabel("Epoch")
+    axes[1].set_ylabel("Loss")
+    axes[1].legend()
+    axes[1].grid(True)
+
+    fig.tight_layout()
+    PLOT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(PLOT_PATH, dpi=150)
+    plt.show()
+    plt.close(fig)
+
 
 def train_model():
     train_ds, validation_ds, _, class_names = create_datasets()
@@ -50,6 +100,8 @@ def train_model():
     history_data.index = range(1, len(history_data) + 1)
     history_data.to_csv(HISTORY_PATH, index_label="epoch")
 
+    plot_training_history(history)
+
     best_loss_epoch = int(
         history_data["val_loss"].idxmin()
     )
@@ -74,4 +126,5 @@ def train_model():
 
 
 if __name__ == "__main__":
-    train_model()
+    # train_model()
+    plot_training_history(pd.read_csv(HISTORY_PATH, index_col="epoch"))
