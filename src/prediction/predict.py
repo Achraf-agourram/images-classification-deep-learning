@@ -86,3 +86,21 @@ def predict_image(image_path, model, class_names):
     }
 
 
+def main():
+    parser = argparse.ArgumentParser(description="Predict the class of a landscape image.")
+
+    parser.add_argument("image_path", help="Path to the image to classify.")
+
+    args = parser.parse_args()
+
+    model, class_names = load_prediction_resources()
+
+    predict_image(
+        args.image_path,
+        model,
+        class_names
+    )
+
+
+if __name__ == "__main__":
+    main()
