@@ -4,6 +4,7 @@ import pandas as pd
 import tensorflow as tf
 from src.data.prepare_dataset import create_datasets
 from src.models.cnn import build_cnn
+import json
 
 
 EPOCHS = 30
@@ -11,6 +12,7 @@ EPOCHS = 30
 MODEL_PATH = Path("models/cnn.keras")
 HISTORY_PATH = Path("reports/metrics/training_history.csv")
 PLOT_PATH = Path("reports/figures/training_curves.png")
+CLASS_NAMES_PATH = Path("models/class_names.json")
 
 
 def plot_training_history(history):
@@ -91,8 +93,12 @@ def train_model():
 
     MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
     HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    CLASS_NAMES_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     model.save(MODEL_PATH)
+
+    with open(CLASS_NAMES_PATH, "w", encoding="utf-8") as file:
+        json.dump(class_names, file, indent=4)
 
     history_data = pd.DataFrame(history.history)
     history_data.index = range(1, len(history_data) + 1)
